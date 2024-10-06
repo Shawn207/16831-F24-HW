@@ -1,8 +1,13 @@
 import os
 import time
+import sys
+
+# Add the root directory of your project to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from rob831.infrastructure.rl_trainer import RL_Trainer
 from rob831.agents.pg_agent import PGAgent
+
 
 class PG_Trainer(object):
 

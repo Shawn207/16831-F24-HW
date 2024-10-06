@@ -46,8 +46,9 @@ class PGAgent(BaseAgent):
         # HINT1: use helper functions to compute qvals and advantages
         # HINT2: look at the MLPPolicyPG class for how to update the policy
             # and obtain a train_log
-
-        raise NotImplementedError
+        q_values = self.calculate_q_vals(rewards_list)
+        advantages = self.estimate_advantage(observations, rewards_list, q_values, terminals)
+        train_log = self.actor.update(observations, actions, advantages, q_values)
 
         return train_log
 
@@ -75,13 +76,20 @@ class PGAgent(BaseAgent):
 
         if not self.reward_to_go:
             #use the whole traj for each timestep
-            raise NotImplementedError
+            q_values = []
+            for rewards in rewards_list:
+                q_value = self._discounted_return(rewards)
+                q_values.extend(q_value)
 
         # Case 2: reward-to-go PG
         # Estimate Q^{pi}(s_t, a_t) by the discounted sum of rewards starting from t
         else:
-            raise NotImplementedError
-
+            #use the rewards from each timestep to the end of the traj
+            q_values = []
+            for rewards in rewards_list:
+                q_value = self._discounted_cumsum(rewards)
+                q_values.extend(q_value)
+        q_values = np.array(q_values)
         return q_values  # return an array
 
     def estimate_advantage(self, obs, rewards_list, q_values, terminals):
@@ -102,8 +110,7 @@ class PGAgent(BaseAgent):
                 ## that the predictions have the same mean and standard deviation as
                 ## the current batch of q_values
 
-            raise NotImplementedError
-            values = TODO
+            values = values_normalized * np.std(q_values) + np.mean(q_values)
 
             if self.gae_lambda is not None:
                 ## append a dummy T+1 value for simpler recursive calculation
@@ -125,7 +132,12 @@ class PGAgent(BaseAgent):
                         ## 0 otherwise.
                     ## HINT 2: self.gae_lambda is the lambda value in the
                         ## GAE formula
-                    raise NotImplementedError
+                    if terminals[i]:
+                        advantages[i] = rewards[i] - values[i]
+                    else:
+                        delta = rewards[i] + self.gamma * values[i + 1] - values[i]
+                        advantages[i] = delta + self.gamma * self.gae_lambda * advantages[i + 1]
+
 
                 # remove dummy advantage
                 advantages = advantages[:-1]
@@ -133,7 +145,7 @@ class PGAgent(BaseAgent):
             else:
                 ## TODO: compute advantage estimates using q_values, and values as baselines
                 # raise NotImplementedError
-                advantages = TODO
+                advantages = q_values - values
 
         # Else, just set the advantage to [Q]
         else:
@@ -144,8 +156,7 @@ class PGAgent(BaseAgent):
             ## TODO: standardize the advantages to have a mean of zero
             ## and a standard deviation of one
 
-            raise NotImplementedError
-            advantages = TODO
+            advantages = (advantages-np.mean(advantages))/np.std(advantages+ 1e-8)
 
         return advantages
 
@@ -171,8 +182,11 @@ class PGAgent(BaseAgent):
             Output: array where each index t contains sum_{t'=0}^T gamma^t' r_{t'}
         """
 
-        # TODO: create discounted_returns
-        raise NotImplementedError
+        discounted_returns = []
+        total_return = 0
+        for t, reward in enumerate(rewards):
+            total_return += reward * (self.gamma ** t)
+        discounted_returns = [total_return] * len(rewards)
 
         return discounted_returns
 
@@ -183,9 +197,10 @@ class PGAgent(BaseAgent):
             -and returns an array where the entry in each index t' is sum_{t'=t}^T gamma^(t'-t) * r_{t'}
         """
 
-        # TODO: create `discounted_cumsums`
-        # HINT: it is possible to write a vectorized solution, but a solution
-            # using a for loop is also fine
-        raise NotImplementedError
-
-        return discounted_cumsums
+        discounted_cumsums = []
+        reward = 0
+        for t in reversed(range(len(rewards))):
+            reward = rewards[t] + (self.gamma * reward)
+            discounted_cumsums.append(reward)
+        return reversed(discounted_cumsums)
+ 
